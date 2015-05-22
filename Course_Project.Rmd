@@ -1,0 +1,133 @@
+Predicting Type of Exercise Using Motion Data
+=============================================
+Jerry C., Prctical Machine Learning - Course Project
+
+###Background###
+
+For this project, we are provided with data collected from "wearable technology" equipment worn by enthusiasts that record their movements via accelerometers on belts, forearms, arms and dumbells. The training set consists of multiple observations, different independent variables and one variable that identifies one of five different ways the dumbbells were lifted (variable `classe`). The goal is to use this training data set to build a model that can then be used to predict the type of dumbbell lift given data on the other independent variables for twenty observations in a test set.
+
+The data are provided from http://groupware.les.inf.puc-rio.br/har.
+
+###Initial Set Up###
+
+First, we will do some basic set up: load required libraries, load the train and test sets and set the seed for reproducibility.
+
+```{r results = 'hide'}
+library(caret)
+library(rpart)
+library(randomForest)
+
+orig_train <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!", ""))
+orig_test <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+
+set.seed(2015)
+```
+
+###Data Cleaning###
+
+There are a couple of things that we can do to clean up the data. First, we can delete the first column which is just the row index.
+
+```{r}
+orig_train <- orig_train[c(-1)]
+orig_test <- orig_test[c(-1)]
+```
+
+Then we can search for zero or near zero variance predictors, which (as their names suggest) are variables that have either unique or relatively few values and are therefore not likely to be useful predictors.
+
+```{r}
+nzv_var <- nearZeroVar(orig_train, saveMetrics = TRUE)
+nzv_var <- subset(nzv_var, nzv_var$nzv == "TRUE")
+```
+
+The function identified thirty-six variables that are near zero variance predictors; we will remove those variables from our data set.
+
+```{r}
+nzv_var_string <- names(orig_train) %in% c("new_window", "kurtosis_yaw_belt", "skewness_yaw_belt", "amplitude_yaw_belt", "avg_roll_arm", "stddev_roll_arm", "var_roll_arm", "avg_pitch_arm", "stddev_pitch_arm", "var_pitch_arm", "avg_yaw_arm", "stddev_yaw_arm", "var_yaw_arm", "max_roll_arm", "min_roll_arm", "min_pitch_arm", "amplitude_roll_arm", "amplitude_pitch_arm", "kurtosis_yaw_dumbbell", "skewness_yaw_dumbbell", "amplitude_yaw_dumbbell", "kurtosis_yaw_forearm", "skewness_yaw_forearm", "max_roll_forearm", "min_roll_forearm", "amplitude_roll_forearm", "amplitude_yaw_forearm", "avg_roll_forearm", "stddev_roll_forearm", "var_roll_forearm", "avg_pitch_forearm", "stddev_pitch_forearm", "var_pitch_forearm", "avg_yaw_forearm", "stddev_yaw_forearm", "var_yaw_forearm")
+
+orig_train <- orig_train[!nzv_var_string]
+orig_test <- orig_test[!nzv_var_string]
+```
+
+A third way to clean up the data set is to eliminate variables that have too many observations that are NA (e.g., more than 50%).
+
+```{r}
+orig_train2 <- orig_train
+orig_test2 <- orig_test
+
+for(i in 1:length(orig_train)){
+   if(sum(is.na(orig_train[, i])) / nrow(orig_train) >= 0.50){
+       for(j in 1:length(orig_train2)){
+           if(length(grep(names(orig_train[i]), names(orig_train2)[j]) == 1)){
+               orig_train2 <- orig_train2[, -j]
+               orig_test2 <- orig_test2[, -j]           
+           }
+       }
+   } 
+}
+```
+
+Finally, let's convert all the relevant variables to a single data type, and get rid of the first few columns that don't contain any predictive data.
+
+```{r}
+orig_train2[, 5:57] <- sapply(orig_train2[, 5:57], as.numeric)
+orig_test2[, 5:57] <- sapply(orig_test2[, 5:57], as.numeric)
+
+orig_train2 <- orig_train2[, 5:58]
+orig_test2 <- orig_test2[5:57]
+```
+
+###Building the Training and Cross Validation Sets###
+
+Now we can split the training set into both a training set and a smaller test set.
+
+```{r}
+inTrain <- createDataPartition(orig_train2$classe, p = 0.75)[[1]]
+training <- orig_train2[inTrain, ]
+testing <- orig_train2[-inTrain, ]
+dim(training)
+dim(testing)
+```
+
+
+###Modeling###
+
+The first method that we will try is the decision tree. The idea is to build a model off of the training data and then test its accuracy on the cross validation data (named here as `testing`). The out of sample error rate for this method will likely be higher than other methods, but we can't say for sure how high it will be.
+
+```{r}
+fitDT <- train(classe ~., data = training, method = "rpart")
+predDT <- predict(fitDT, testing)
+confusionMatrix(predDT, testing$classe)
+```
+
+The accuracy rate of 52.49% is not awful, but it's certainly not the method to use if a grade depended on it. It's more or less a coin toss.
+
+The second method we will try is random forest. This method is similar to the decision tree method, but more rigorous; it's like running decision tree many, many times and then taking the average of those runs. The out of sample error rate for this method should be much lower.
+
+```{r}
+fitRF <- randomForest(classe ~., data = training)
+predRF <- predict(fitRF, testing)
+confusionMatrix(predRF, testing$classe)
+```
+
+As expected, the accuracy is 99.82%. So a bit better than the decision tree method.
+
+###Predicting the Test Data###
+
+Having seen the accuracy of random forest method, let's use it to predict the outcomes on our actual test data set.
+
+```{r}
+predRF_new <- predict(fitRF, orig_test2)
+```
+
+We can use the code provided to generate the text files for submission.
+
+```{r}
+pml_write_files = function(x){
+    for(i in 1:length(x)){
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+    }
+}
+
+pml_write_files(predRF_new)
+```
