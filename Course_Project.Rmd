@@ -96,6 +96,9 @@ The first method that we will try is the decision tree. The idea is to build a m
 ```{r}
 fitDT <- train(classe ~., data = training, method = "rpart")
 predDT <- predict(fitDT, testing)
+```
+
+```{r}
 confusionMatrix(predDT, testing$classe)
 ```
 
@@ -121,7 +124,7 @@ predRF_new <- predict(fitRF, orig_test2)
 
 We can use the code provided to generate the text files for submission.
 
-```{r}
+```{r eval = FALSE}
 pml_write_files = function(x){
     for(i in 1:length(x)){
         filename = paste0("problem_id_", i, ".txt")
