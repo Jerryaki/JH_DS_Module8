@@ -1,3 +1,6 @@
+---
+output: pdf_document
+---
 Predicting Type of Exercise Using Motion Data
 =============================================
 Jerry C., Prctical Machine Learning - Course Project
@@ -96,7 +99,7 @@ The first method that we will try is the decision tree. The idea is to build a m
 ```{r}
 fitDT <- train(classe ~., data = training, method = "rpart")
 predDT <- predict(fitDT, testing)
-print(confusionMatrix(predDT, testing$classe))
+confusionMatrix(predDT, testing$classe)
 ```
 
 The accuracy rate of 52.49% is not awful, but it's certainly not the method to use if a grade depended on it. It's more or less a coin toss.
@@ -106,12 +109,12 @@ The second method we will try is random forest. This method is similar to the de
 ```{r}
 fitRF <- randomForest(classe ~., data = training)
 predRF <- predict(fitRF, testing)
-print(confusionMatrix(predRF, testing$classe))
+confusionMatrix(predRF, testing$classe)
 ```
 
 As expected, the accuracy is 99.82%. So a bit better than the decision tree method.
 
-Note: Normally we'd want to look at the full output from the confusionMatrix function, but it was not displaying on Github (even though it displayed locally). 
+Note: The confusionMatrix output shows up normally on my local instance, but for some reason is lost upon upload to Github. To view the local output, please use the pdf version included in this repo.
 
 ###Predicting the Test Data###
 
